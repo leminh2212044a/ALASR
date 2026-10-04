@@ -98,8 +98,10 @@ def build_dataset(utt_ids, manifest: Dict, transcripts: Dict, processor):
         batch["input_values"] = processor(
             audio, sampling_rate=SAMPLE_RATE
         ).input_values[0]
-        with processor.as_target_processor():
-            batch["labels"] = processor(normalize_text(batch["text"])).input_ids
+        batch["input_length"] = len(batch["input_values"])          # cho group_by_length
+        batch["labels"] = processor.tokenizer(
+            normalize_text(batch["text"])
+        ).input_ids
         return batch
 
     return ds.map(_prepare, remove_columns=ds.column_names, num_proc=1)
@@ -114,8 +116,9 @@ class DataCollatorCTC:
         labels = [{"input_ids": f["labels"]} for f in features]
 
         batch = self.processor.pad(inputs, padding=True, return_tensors="pt")
-        with self.processor.as_target_processor():
-            lab_batch = self.processor.pad(labels, padding=True, return_tensors="pt")
+        lab_batch = self.processor.tokenizer.pad(
+            labels, padding=True, return_tensors="pt"
+        )
 
         # -100 de CTC loss bo qua vi tri padding
         batch["labels"] = lab_batch["input_ids"].masked_fill(
@@ -145,8 +148,9 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
     # So buoc huan luyen ti le voi luong du lieu.
     # Tham khao wav2vec 2.0 Table 6; con so duoi la diem xuat phat, can tinh chinh.
     if max_steps is None:
-        max_steps = int(np.clip(2000 * hours, 2000, 20000))
-    print(f"    max_steps = {max_steps}")
+        eff_batch = 16                      # per_device_batch x grad_accum
+        max_steps = int(np.clip(55 * len(utt_ids) / eff_batch, 800, 8000))
+    print(f"    max_steps = {max_steps}  (~{max_steps*16/len(utt_ids):.0f} epoch)")
 
     vocab_path = out_dir / "vocab.json"
     build_vocab([transcripts[u] for u in utt_ids], vocab_path)
@@ -158,6 +162,8 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
     model = Wav2Vec2ForCTC.from_pretrained(
         base_model,
         ctc_loss_reduction="mean",
+        ctc_zero_infinity=True, 
+        gradient_checkpointing=False,  
         pad_token_id=processor.tokenizer.pad_token_id,
         vocab_size=len(processor.tokenizer),
         # SpecAugment -- wav2vec 2.0 ghi ro no cai thien dang ke o vung it nhan
@@ -182,7 +188,8 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
         fp16=torch.cuda.is_available(),
         save_strategy="no",
         logging_steps=100,
-        group_by_length=False,
+        group_by_length=True,
+        length_column_name="input_length",
         seed=seed,
         report_to=[],                       # doi thanh ["wandb"] tu tuan 6
     )
@@ -220,6 +227,12 @@ def evaluate(model, processor, utt_ids, manifest, transcripts, batch_log=200):
         refs.append(transcripts[uid].upper().strip())
         if i % batch_log == 0:
             print(f"    decode {i}/{len(utt_ids)} ...")
+
+    print("\n--- 5 vi du dau tien ---")
+    for r, h in zip(refs[:5], hyps[:5]):
+        print(f"  REF: {r[:70]}")
+        print(f"  HYP: '{h[:70]}'")
+        print()
 
     wer = jiwer.wer(refs, hyps)
     cer = jiwer.cer(refs, hyps)
