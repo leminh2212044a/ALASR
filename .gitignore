@@ -1,0 +1,16 @@
+# Dữ liệu và kết quả — KHÔNG đẩy lên GitHub
+data/*.jsonl
+data/librispeech/
+runs/
+*.ckpt
+*.bin
+*.safetensors
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Notebook
+.ipynb_checkpoints/
