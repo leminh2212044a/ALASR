@@ -65,6 +65,8 @@ def main(a):
     model, processor = finetune(
         seed_ids, train_mf, train_tx,
         out_dir=out_dir, max_steps=a.max_steps, seed=a.seed,
+        per_device_batch=a.batch, grad_accum=a.grad_accum,
+        num_workers=a.num_workers,
     )
     train_sec = time.time() - t0
 
@@ -128,5 +130,11 @@ if __name__ == "__main__":
     p.add_argument("--hours", type=float, default=1.0)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--max-steps", type=int, default=None)
+    # GIU batch * grad_accum = 16 khi doi GPU, neu khong con so neo khong
+    # con dung lam tham chieu cho cac tuan sau.
+    #   T4 16GB: 4/4   |   L4 24GB: 8/2   |   A100 40GB: 16/1
+    p.add_argument("--batch", type=int, default=4)
+    p.add_argument("--grad-accum", type=int, default=4)
+    p.add_argument("--num-workers", type=int, default=2)
     p.add_argument("--out-dir", default="runs/anchor")
     main(p.parse_args())
