@@ -286,6 +286,16 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
     )
     model.freeze_feature_encoder()          # <-- BAT BUOC
 
+    # TAT gradient checkpointing MOT CACH TUONG MINH.
+    # Dat gradient_checkpointing=False trong TrainingArguments la KHONG DU:
+    # config.json cua checkpoint goc co the da bat san, va Trainer chi "bat"
+    # chu khong "tat". Dau hieu con bat: log in canh bao
+    # "torch.utils.checkpoint: the use_reentrant parameter ..."
+    # Hau qua: cham khoang 40% (2.3 s/buoc thay vi ~1.4 s/buoc tren T4).
+    model.config.gradient_checkpointing = False
+    if hasattr(model, "gradient_checkpointing_disable"):
+        model.gradient_checkpointing_disable()
+
     # --- Optimizer + lich hoc tu dinh nghia (khong de Trainer tu tao) ---
     optimizer = AdamW(model.parameters(), lr=learning_rate,
                       betas=(0.9, 0.98), eps=1e-8, weight_decay=0.0)
