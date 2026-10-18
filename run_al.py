@@ -54,7 +54,7 @@ from pathlib import Path
 from data.oracle import Oracle
 from data.pool import Pool
 from models.w2v2_ctc import (
-    finetune, evaluate, load_manifest, load_transcripts,
+    finetune, evaluate, load_manifest, load_transcripts, load_round_model,
 )
 from strategies import SelectionContext, build
 
@@ -87,9 +87,33 @@ def main(a):
     test_mf = load_manifest(a.test_manifest)
     test_tx = load_transcripts(a.test_transcripts)
 
-    pool = Pool(train_mf)
-    oracle = Oracle(a.train_transcripts, log_path=out_dir / "oracle_log.jsonl")
     strategy = build(a.strategy)
+
+    # ---------- CHAY TIEP tu lan chay bi ngat ----------
+    # Trang thai pool duoc luu sau MOI vong, nen chi can nap lai file moi nhat.
+    start_round, model, processor = 0, None, None
+    saved = sorted(out_dir.glob("pool_round*.json"),
+                   key=lambda p: int(p.stem.replace("pool_round", "")))
+
+    pool = Pool(train_mf)
+    oracle = Oracle(a.train_transcripts,
+                    log_path=out_dir / "oracle_log.jsonl",
+                    append=bool(a.resume and saved))
+
+    if a.resume and saved:
+        last = int(saved[-1].stem.replace("pool_round", ""))
+        pool.load(saved[-1])
+        oracle.restore(pool.round_map)
+        oracle.audit(pool)
+        start_round = last + 1
+        print(f"\nCHAY TIEP: da xong vong 0..{last} "
+              f"({pool.labeled_hours:.2f} gio), bat dau tu vong {start_round}")
+        if strategy.needs_model:
+            prev = out_dir / f"round{last}"
+            print(f"  nap model vong {last} tu {prev}")
+            model, processor = load_round_model(prev)
+    elif a.resume:
+        print("\n--resume nhung chua co trang thai nao -> chay tu vong 0")
 
     test_ids = sorted(test_mf.keys())
     if a.test_subset:
@@ -107,10 +131,9 @@ def main(a):
     print(f"  Ngan sach cuoi: {a.seed_hours + a.budget_hours * a.rounds} gio")
     print("=" * 66)
 
-    model = processor = None
     records = []
 
-    for r in range(a.rounds + 1):
+    for r in range(start_round, a.rounds + 1):
         t_round = time.time()
         print(f"\n{'#' * 66}\n#  VONG {r}\n{'#' * 66}")
 
@@ -193,13 +216,20 @@ def main(a):
                 p.unlink(missing_ok=True)
 
     # ---------- BANG TONG KET ----------
+    # Doc lai TU FILE de bang day du ca cac vong da chay o phien truoc.
+    all_recs = []
+    if results_path.exists():
+        with open(results_path, encoding="utf-8") as f:
+            all_recs = [json.loads(l) for l in f if l.strip()]
+    all_recs = all_recs or records
+
     print()
     print("=" * 66)
     print(f"  DUONG CONG HOC — {strategy.name} (seed {a.seed})")
     print("=" * 66)
     print(f"  {'vong':>4} | {'gio nhan':>9} | {'so cau':>7} | {'WER %':>7} | {'CER %':>7}")
     print("-" * 66)
-    for rec in records:
+    for rec in all_recs:
         print(f"  {rec['round']:>4} | {rec['labeled_hours']:>9.2f} | "
               f"{rec['n_labeled']:>7} | {rec['wer']:>7.2f} | {rec['cer']:>7.2f}")
     print("=" * 66)
@@ -229,5 +259,8 @@ if __name__ == "__main__":
                    help="0 = danh gia tren toan bo test set")
     p.add_argument("--keep-last-only", action="store_true",
                    help="xoa trong so cua vong truoc de tiet kiem dung luong")
+    p.add_argument("--resume", action="store_true",
+                   help="chay tiep tu vong cuoi da luu trong --out-dir "
+                        "(dung khi phien Colab bi ngat giua duong)")
     p.add_argument("--out-dir", default="runs/al")
     main(p.parse_args())

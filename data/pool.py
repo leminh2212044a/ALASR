@@ -62,6 +62,11 @@ class Pool:
     def round_of(self, uid: str) -> int:
         return self._round_of[uid]
 
+    @property
+    def round_map(self) -> Dict[str, int]:
+        """utt_id -> vong da chon no. Dung de phuc hoi Oracle khi chay tiep."""
+        return dict(self._round_of)
+
     # ---------------- cap nhat ----------------
 
     def add_labeled(self, uids: Sequence[str], round_idx: int) -> None:

@@ -38,7 +38,7 @@ from typing import Dict, Iterable, List
 
 
 class Oracle:
-    def __init__(self, transcripts_path, log_path=None):
+    def __init__(self, transcripts_path, log_path=None, append=False):
         self.__transcripts: Dict[str, str] = {}
         with open(transcripts_path, encoding="utf-8") as f:
             for line in f:
@@ -49,7 +49,8 @@ class Oracle:
         self.log_path = Path(log_path) if log_path else None
         if self.log_path:
             self.log_path.parent.mkdir(parents=True, exist_ok=True)
-            self.log_path.write_text("", encoding="utf-8")
+            if not append:                      # append=True khi chay tiep
+                self.log_path.write_text("", encoding="utf-8")
 
         print(f"Oracle: nap {len(self.__transcripts)} transcript "
               f"(tap nay KHONG duoc doc o bat ky noi khac)")
@@ -79,6 +80,19 @@ class Oracle:
                     f.write(json.dumps({"round": round_idx, "utt_id": u,
                                         "ts": time.time()}) + "\n")
         return out
+
+    def restore(self, round_map: Dict[str, int]) -> None:
+        """
+        Phuc hoi danh sach da query khi CHAY TIEP mot lan chay bi ngat.
+
+        Khong ghi log lai (nhat ky cu van con), va khong doc them transcript
+        nao ngoai nhung cau da nam trong round_map -> van khong ro ri nhan.
+        """
+        missing = [u for u in round_map if u not in self.__transcripts]
+        if missing:
+            raise KeyError(f"khong co transcript cho {missing[:5]}")
+        self._queried = {u: int(r) for u, r in round_map.items()}
+        print(f"Oracle: phuc hoi {len(self._queried)} cau da gan nhan truoc do")
 
     def labeled_texts(self) -> Dict[str, str]:
         """Transcript cua NHUNG CAU DA DUOC QUERY — dung de fine-tune."""

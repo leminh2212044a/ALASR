@@ -117,6 +117,20 @@ def main():
     assert abs(pool2.labeled_hours - pool.labeled_hours) < 1e-9
     ok("nap lai dung trang thai")
 
+    print("\n--- 10. Chay tiep: Oracle.restore + audit van thong qua ---")
+    pool3 = Pool(mf)
+    pool3.load(tmp / "pool.json")
+    oracle3 = Oracle(tx_path, log_path=tmp / "log.jsonl", append=True)
+    oracle3.restore(pool3.round_map)
+    oracle3.audit(pool3)
+    assert oracle3.n_queried == len(pool3.labeled)
+    # sau khi phuc hoi, query tiep mot cau MOI phai duoc chap nhan
+    nxt, _ = pool3.take_until_budget(pool3.unlabeled, 0.02)
+    oracle3.query(nxt, round_idx=2)
+    pool3.add_labeled(nxt, round_idx=2)
+    oracle3.audit(pool3)
+    ok(f"phuc hoi {len(pool3.labeled) - len(nxt)} cau, query tiep {len(nxt)} cau")
+
     print("\n" + "=" * 54)
     print("  TAT CA KIEM TRA TUAN 4 DAT. San sang chay run_al.py")
     print("=" * 54 + "\n")

@@ -329,6 +329,24 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
         callbacks=[FreezeTransformerCallback(model, unfreeze_at)],
     )
     trainer.train()
+
+    # LUU TRONG SO. Bat buoc vi hai ly do:
+    #   1. Tu tuan 5, chien luoc can model cua vong TRUOC de tinh diem
+    #      khong chac chan -> phai nap lai duoc.
+    #   2. Cho phep chay tiep mot lan chay AL bi ngat giua duong
+    #      (run_al.py --resume).
+    trainer.save_model(str(out_dir))
+    return model, processor
+
+
+def load_round_model(run_dir, device=None):
+    """Nap lai model + processor da luu cua mot vong truoc do."""
+    run_dir = str(run_dir)
+    processor = Wav2Vec2Processor.from_pretrained(run_dir)
+    model = Wav2Vec2ForCTC.from_pretrained(run_dir)
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
     return model, processor
 
 
