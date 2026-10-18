@@ -233,11 +233,31 @@ class FreezeTransformerCallback(TrainerCallback):
 # 4. FINE-TUNE
 # =====================================================================
 
+def gpu_profile():
+    """
+    Chon dinh dang so va bat TF32 theo GPU dang co.
+
+    - T4 (Turing): khong co bf16 -> dung fp16 + GradScaler.
+    - L4 / A100 (Ampere tro len): co bf16 -> on dinh hon fp16, khong can
+      GradScaler; bat TF32 cho phep nhan ma tran nhanh hon dang ke.
+    """
+    if not torch.cuda.is_available():
+        return {"fp16": False, "bf16": False, "name": "cpu"}
+
+    name = torch.cuda.get_device_name(0)
+    has_bf16 = torch.cuda.is_bf16_supported()
+    if has_bf16:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+    return {"fp16": not has_bf16, "bf16": has_bf16, "name": name}
+
+
 def finetune(utt_ids, manifest, transcripts, out_dir,
              max_steps=None, seed=0, base_model=BASE_MODEL,
              learning_rate=LEARNING_RATE,
              per_device_batch=PER_DEVICE_BATCH,
-             grad_accum=GRAD_ACCUM):
+             grad_accum=GRAD_ACCUM,
+             num_workers=2):
     """
     utt_ids     : danh sach utt_id DA CO NHAN
     manifest    : dict[utt_id] -> {path, duration, ...}
@@ -254,6 +274,9 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
         max_steps = int(np.clip(2000 * hours, DEFAULT_MAX_STEPS, 20_000))
     unfreeze_at = max(int(max_steps * FREEZE_RATIO), 1)
 
+    gp = gpu_profile()
+    print(f"    GPU            = {gp['name']}  "
+          f"({'bf16 + TF32' if gp['bf16'] else 'fp16' if gp['fp16'] else 'fp32'})")
     print(f"    max_steps      = {max_steps}")
     print(f"    learning_rate  = {learning_rate:g}  (bai goc: 2e-5 / 3e-5)")
     print(f"    batch hieu dung= {per_device_batch} x {grad_accum} "
@@ -308,13 +331,14 @@ def finetune(utt_ids, manifest, transcripts, out_dir,
         max_steps=max_steps,
         # KHONG dat learning_rate / warmup_ratio / lr_scheduler_type o day:
         # da truyen optimizer + scheduler truc tiep vao Trainer.
-        fp16=torch.cuda.is_available(),
-        gradient_checkpointing=False,       # nhanh hon ~30%
+        fp16=gp["fp16"],
+        bf16=gp["bf16"],                    # Ampere tro len: on dinh hon fp16
+        gradient_checkpointing=False,
         group_by_length=True,               # giam padding vo ich
         length_column_name="input_length",
         save_strategy="no",
         logging_steps=50,
-        dataloader_num_workers=2,
+        dataloader_num_workers=num_workers,
         remove_unused_columns=False,
         seed=seed,
         report_to=[],                       # doi thanh ["wandb"] tu tuan 6

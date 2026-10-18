@@ -174,6 +174,8 @@ def main(a):
         model, processor = finetune(
             pool.labeled, train_mf, labeled_tx,
             out_dir=run_dir, max_steps=a.max_steps, seed=a.seed,
+            per_device_batch=a.batch, grad_accum=a.grad_accum,
+            num_workers=a.num_workers,
         )
         train_sec = time.time() - t0
 
@@ -253,6 +255,17 @@ if __name__ == "__main__":
     p.add_argument("--budget-hours", type=float, default=1.0)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--max-steps", type=int, default=None)
+    # GIU NGUYEN batch hieu dung = batch * grad_accum = 16 cau khi doi GPU,
+    # neu khong ket qua khong con so sanh duoc voi lan neo o tuan 3.
+    #   T4   16GB : --batch 4  --grad-accum 4
+    #   L4   24GB : --batch 8  --grad-accum 2
+    #   A100 40GB : --batch 16 --grad-accum 1
+    p.add_argument("--batch", type=int, default=4,
+                   help="so cau moi lan forward tren GPU")
+    p.add_argument("--grad-accum", type=int, default=4,
+                   help="so lan tich luy gradient truoc khi cap nhat")
+    p.add_argument("--num-workers", type=int, default=2,
+                   help="luong doc du lieu; 4-8 khi dung A100")
     p.add_argument("--candidate-size", type=int, default=5000,
                    help="0 = dung toan bo tap chua nhan")
     p.add_argument("--test-subset", type=int, default=0,
