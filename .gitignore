@@ -1,16 +1,16 @@
-# Dữ liệu và kết quả — KHÔNG đẩy lên GitHub
-data/*.jsonl
+# Du lieu tho — khong bao gio day len
 data/librispeech/
-runs/
-*.ckpt
-*.bin
-*.safetensors
+data/LibriSpeech/
+*.tar.gz
 
-# Python
+# Trong so mo hinh — 380 MB moi vong, vuot gioi han GitHub
+runs/**/round*/
+*.safetensors
+*.bin
+*.pt
+
+# Rac
 __pycache__/
 *.pyc
 .venv/
-venv/
-
-# Notebook
 .ipynb_checkpoints/

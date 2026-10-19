@@ -1,0 +1,3 @@
+{"strategy": "random", "seed": 0, "round": 0, "labeled_hours": 0.9901, "n_labeled": 280, "n_picked": 280, "hours_picked": 0.9901, "wer": 100.0, "cer": 100.0, "n_empty_hyp": 300, "train_sec": 1455.5, "eval_sec": 20.8, "round_sec": 1476.3}
+{"strategy": "random", "seed": 0, "round": 1, "labeled_hours": 1.9835, "n_labeled": 555, "n_picked": 275, "hours_picked": 0.9934, "wer": 100.0, "cer": 100.0, "n_empty_hyp": 300, "train_sec": 1465.2, "eval_sec": 20.4, "round_sec": 1485.6}
+{"strategy": "random", "seed": 0, "round": 2, "labeled_hours": 2.9742, "n_labeled": 831, "n_picked": 276, "hours_picked": 0.9906, "wer": 100.0, "cer": 100.0, "n_empty_hyp": 300, "train_sec": 1466.4, "eval_sec": 20.5, "round_sec": 1486.9}
