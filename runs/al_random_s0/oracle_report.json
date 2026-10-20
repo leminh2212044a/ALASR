@@ -1,0 +1,22 @@
+[
+  {
+    "round": 0,
+    "n_queried": 280
+  },
+  {
+    "round": 1,
+    "n_queried": 275
+  },
+  {
+    "round": 2,
+    "n_queried": 276
+  },
+  {
+    "round": 3,
+    "n_queried": 281
+  },
+  {
+    "round": 4,
+    "n_queried": 287
+  }
+]
